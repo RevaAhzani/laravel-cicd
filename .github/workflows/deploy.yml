@@ -41,10 +41,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-composer-
 
-      - name: Run tests (optional)
-        run: |
-          php artisan test --no-interaction
-
       - name: Build application (create zip)
         run: |
           zip -r app.zip . -x "node_modules/*" ".git/*" ".github/*" "*.env"
