@@ -75,7 +75,7 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v3
         with:
-          name: laravel-artifact
+          name: laravel-latihan
 
       - name: Deploy to Elastic Beanstalk
         env:
