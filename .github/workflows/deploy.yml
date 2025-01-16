@@ -25,9 +25,13 @@ jobs:
           curl -sS https://getcomposer.org/installer | php
           sudo mv composer.phar /usr/local/bin/composer
 
+      # Install dependencies and optimize Laravel application
       - name: Install dependencies
         run: |
-          composer install --no-interaction --prefer-dist
+          composer install --no-dev --optimize-autoloader
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
 
       - name: Cache vendor directory
         uses: actions/cache@v3
