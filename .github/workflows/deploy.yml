@@ -13,11 +13,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up PHP
-        uses: actions/setup-php@v2
+      # Setup PHP with necessary extensions
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-          extensions: mbstring, bcmath, opcache, zip
+          php-version: '8.2'  # Update to PHP 8.2 for compatibility with packages
+          extensions: mbstring, bcmath, intl, pdo, mysqli
 
       - name: Set up Composer
         run: |
