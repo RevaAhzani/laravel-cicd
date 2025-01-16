@@ -3,7 +3,7 @@ name: Laravel CI/CD
 on:
   push:
     branches:
-      - main  # Ganti dengan nama branch yang Anda gunakan (misal, master atau main)
+      - main
 
 jobs:
   build:
@@ -15,27 +15,25 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.0'  # Ganti dengan versi PHP yang sesuai dengan aplikasi Laravel Anda
-          extensions: mbstring, bcmath, curl, zip, fileinfo  # Menambahkan ekstensi PHP yang diperlukan
+          php-version: '8.1'  # Sesuaikan dengan versi PHP yang digunakan pada aplikasi Laravel
 
-      - name: Install Composer
+      - name: Set up Composer
         run: |
           curl -sS https://getcomposer.org/installer | php
-          mv composer.phar /usr/local/bin/composer
+          sudo mv composer.phar /usr/local/bin/composer
 
-      - name: Install Laravel dependencies
+      - name: Install Composer dependencies
         run: |
-          composer install --no-dev --prefer-dist --optimize-autoloader
+          composer install --no-dev --optimize-autoloader --no-interaction
 
-      - name: Build and Zip Laravel App
-        run: |
-          zip -r laravel-app.zip .  # Membuat file zip dari seluruh aplikasi
+      - name: Archive Laravel project
+        run: zip -r laravel.zip . -x "node_modules/" ".git/" "storage/" "vendor/" ".env"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: laravel-app
-          path: laravel-app.zip
+          name: laravel-artifact
+          path: laravel.zip
 
       - name: Configure AWS CLI
         run: |
@@ -44,9 +42,9 @@ jobs:
           aws configure set aws_session_token ${{ secrets.AWS_SESSION_TOKEN }}
           aws configure set region ${{ secrets.AWS_REGION }}
 
-      - name: Upload Laravel App to S3
+      - name: Upload to S3
         run: |
-          aws s3 cp laravel-app.zip s3://${{ secrets.S3_BUCKET_NAME }}/laravel-app/${{ github.sha }}.zip
+          aws s3 cp laravel.zip s3://${{ secrets.S3_BUCKET_NAME }}/laravel.zip
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -56,28 +54,31 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-
     steps:
-    - name: Download build artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: laravel-app
+      - name: Download build artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: laravel-artifact
 
-    - name: Deploy to Elastic Beanstalk
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        EB_ENV_NAME: ${{ secrets.EB_ENV_NAME }}
-        EB_APP_NAME: ${{ secrets.EB_APP_NAME }}
-        S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
-      run: |
-        VERSION_LABEL="${{ github.sha }}-$(date +%s)"
-        aws elasticbeanstalk create-application-version \
-          --application-name ${{ secrets.EB_APP_NAME }} \
-          --version-label $VERSION_LABEL \
-          --source-bundle S3Bucket=${{ secrets.S3_BUCKET_NAME }},S3Key=laravel-app/${{ github.sha }}.zip
-        aws elasticbeanstalk update-environment \
-          --environment-name ${{ secrets.EB_ENV_NAME }} \
-          --version-label $VERSION_LABEL
+      - name: Deploy to Elastic Beanstalk
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          EB_ENV_NAME: ${{ secrets.EB_ENV_NAME }}
+          EB_APP_NAME: ${{ secrets.EB_APP_NAME }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+        run: |
+          VERSION_LABEL="${{ github.sha }}-$(date +%s)"
+          
+          # Membuat aplikasi versi baru di Elastic Beanstalk dari file yang ada di S3
+          aws elasticbeanstalk create-application-version \
+            --application-name ${{ secrets.EB_APP_NAME }} \
+            --version-label $VERSION_LABEL \
+            --source-bundle S3Bucket=${{ secrets.S3_BUCKET_NAME }},S3Key=laravel.zip
+
+          # Mengupdate environment Elastic Beanstalk untuk menggunakan versi baru
+          aws elasticbeanstalk update-environment \
+            --environment-name ${{ secrets.EB_ENV_NAME }} \
+            --version-label $VERSION_LABEL
